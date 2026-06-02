@@ -31,33 +31,28 @@ jobs:
           unzip -q /tmp/gradle.zip -d /opt/gradle
           echo "/opt/gradle/gradle-7.6/bin" >> $GITHUB_PATH
 
+      - name: Verify project structure
+        run: |
+          echo "=== Project files ==="
+          find android -type f | sort
+          echo "=== Assets ==="
+          ls -la android/app/src/main/assets/
+          echo "=== index.html size ==="
+          wc -c android/app/src/main/assets/index.html
+
       - name: Build APK
         working-directory: android
         run: |
           export ANDROID_HOME=${ANDROID_SDK_ROOT}
-          gradle assembleDebug --no-daemon
+          gradle assembleDebug --no-daemon --info 2>&1 | tail -50
 
-      - name: Find and verify APK
-        id: find_apk
+      - name: Find APK and check size
         run: |
-          echo "Searching for APK files..."
-          find /home/runner/work -name "*.apk" -type f 2>/dev/null | while read f; do
-            echo "Found: $f ($(du -sh $f | cut -f1))"
-          done
-          APK_PATH=$(find /home/runner/work -name "app-debug.apk" -type f 2>/dev/null | head -1)
-          if [ -z "$APK_PATH" ]; then
-            echo "No APK found! Checking build output dir..."
-            find /home/runner/work -type d -name "apk" 2>/dev/null
-            find /home/runner/work -type d -name "outputs" 2>/dev/null
-            exit 1
-          fi
-          echo "APK found: $APK_PATH"
-          echo "Size: $(du -sh $APK_PATH)"
-          # Verify it contains our game
-          unzip -l "$APK_PATH" | grep -c "assets" || true
-          unzip -l "$APK_PATH" | grep "index.html" && echo "✓ Game HTML confirmed in APK!" || echo "WARNING: index.html not found in APK"
-          cp "$APK_PATH" /tmp/flying-george.apk
-          echo "apk_path=/tmp/flying-george.apk" >> $GITHUB_OUTPUT
+          APK=$(find /home/runner/work -name "*.apk" 2>/dev/null | head -1)
+          echo "APK: $APK"
+          ls -lh "$APK"
+          unzip -l "$APK" | grep index || echo "No index.html in APK"
+          cp "$APK" /tmp/flying-george.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
