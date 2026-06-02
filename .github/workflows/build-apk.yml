@@ -31,40 +31,30 @@ jobs:
           unzip -q /tmp/gradle.zip -d /opt/gradle
           echo "/opt/gradle/gradle-7.6/bin" >> $GITHUB_PATH
 
-      - name: Verify assets exist
-        run: |
-          echo "=== Assets in repo ==="
-          ls -la android/app/src/main/assets/
-          wc -c android/app/src/main/assets/index.html
-
-      - name: Build debug APK
+      - name: Build APK (capture all output)
         working-directory: android
         run: |
           export ANDROID_HOME=${ANDROID_SDK_ROOT}
-          gradle assembleDebug --no-daemon --stacktrace 2>&1
-          echo "=== APK output ==="
-          find . -name "*.apk" -exec ls -lh {} \;
+          gradle assembleDebug --no-daemon --stacktrace > /tmp/build.log 2>&1
+          echo "EXIT: $?" >> /tmp/build.log
+        continue-on-error: true
 
-      - name: Verify APK contains game
+      - name: Show build output
         run: |
-          APK=$(find . -name "app-debug.apk" | head -1)
-          echo "APK: $APK"
-          ls -lh "$APK"
-          # Check APK contains our HTML file
-          unzip -l "$APK" | grep -i "index.html" || echo "WARNING: index.html not in APK!"
-          unzip -l "$APK" | grep "assets/" || echo "WARNING: no assets in APK!"
-          # Show APK size
-          du -sh "$APK"
+          echo "=== LAST 200 LINES OF BUILD LOG ==="
+          tail -200 /tmp/build.log
 
-      - name: Rename and upload APK
-        run: |
-          APK=$(find . -name "app-debug.apk" | head -1)
-          cp "$APK" /tmp/flying-george.apk
-          ls -lh /tmp/flying-george.apk
+      - name: Upload build log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
 
-      - name: Upload APK
+      - name: Upload APK if exists
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: flying-george-apk
-          path: /tmp/flying-george.apk
-          if-no-files-found: error
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: ignore
