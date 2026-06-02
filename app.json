@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Flying George",
+    "slug": "flying-george",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "backgroundColor": "#0d0b1e",
+    "platforms": ["android"],
+    "android": {
+      "package": "com.pfarramterloeser.flyinggeorge",
+      "versionCode": 1,
+      "adaptiveIcon": { "backgroundColor": "#1a1a2e" },
+      "permissions": []
+    }
+  }
+}
