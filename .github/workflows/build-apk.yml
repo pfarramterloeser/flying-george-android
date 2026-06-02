@@ -31,27 +31,32 @@ jobs:
           unzip -q /tmp/gradle.zip -d /opt/gradle
           echo "/opt/gradle/gradle-7.6/bin" >> $GITHUB_PATH
 
-      - name: Verify project structure
+      - name: Debug asset and project structure
         run: |
-          echo "=== Project files ==="
+          echo "=== Full android project tree ==="
           find android -type f | sort
-          echo "=== Assets ==="
-          ls -la android/app/src/main/assets/
-          echo "=== index.html size ==="
-          wc -c android/app/src/main/assets/index.html
+          echo ""
+          echo "=== Assets content ==="
+          ls -la android/app/src/main/assets/ || echo "NO ASSETS DIR"
+          echo ""
+          echo "=== index.html present? ==="
+          test -f android/app/src/main/assets/index.html && echo "YES: $(wc -c < android/app/src/main/assets/index.html) bytes" || echo "NO"
 
       - name: Build APK
         working-directory: android
         run: |
           export ANDROID_HOME=${ANDROID_SDK_ROOT}
-          gradle assembleDebug --no-daemon --info 2>&1 | tail -50
+          gradle assembleDebug --no-daemon
 
-      - name: Find APK and check size
+      - name: Verify APK contents
         run: |
-          APK=$(find /home/runner/work -name "*.apk" 2>/dev/null | head -1)
-          echo "APK: $APK"
-          ls -lh "$APK"
-          unzip -l "$APK" | grep index || echo "No index.html in APK"
+          APK=$(find /home/runner/work -name "app-debug.apk" 2>/dev/null | head -1)
+          echo "APK path: $APK"
+          echo "APK size: $(du -sh $APK)"
+          echo "=== APK contents (assets) ==="
+          unzip -l "$APK" | grep -i asset || echo "NO ASSETS IN APK!"
+          echo "=== All APK entries ==="
+          unzip -l "$APK"
           cp "$APK" /tmp/flying-george.apk
 
       - name: Upload APK
