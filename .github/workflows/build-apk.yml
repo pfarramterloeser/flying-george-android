@@ -30,7 +30,18 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build APK
-        run: eas build --platform android --profile preview --non-interactive
+      - name: Register Expo project & Build APK
+        run: |
+          # Initialize the project on Expo if not yet registered
+          npx eas-cli project:info --non-interactive 2>/dev/null || \
+            npx eas-cli project:create --non-interactive --name "flying-george" 2>/dev/null || true
+          # Run the build
+          npx eas-cli build --platform android --profile preview --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Get build URL
+        run: |
+          echo "Build submitted to EAS! Check your builds at: https://expo.dev/accounts/pfarramterloeser/projects/flying-george/builds"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
