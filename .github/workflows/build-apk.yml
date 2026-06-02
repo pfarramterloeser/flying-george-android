@@ -31,25 +31,40 @@ jobs:
           unzip -q /tmp/gradle.zip -d /opt/gradle
           echo "/opt/gradle/gradle-7.6/bin" >> $GITHUB_PATH
 
-      - name: Build APK
+      - name: Verify assets exist
+        run: |
+          echo "=== Assets in repo ==="
+          ls -la android/app/src/main/assets/
+          wc -c android/app/src/main/assets/index.html
+
+      - name: Build debug APK
         working-directory: android
         run: |
           export ANDROID_HOME=${ANDROID_SDK_ROOT}
-          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
-          BUILD_EXIT=${PIPESTATUS[0]}
-          echo "==EXIT_CODE== $BUILD_EXIT"
-          # Post log to GitHub via API for debugging
-          LOG=$(tail -150 /tmp/build.log | base64 -w 0)
-          curl -s -X PUT \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            "https://api.github.com/repos/${{ github.repository }}/contents/build-output.log" \
-            -d "{\"message\":\"CI: build log [skip ci]\",\"content\":\"$LOG\"}" > /dev/null 2>&1 || true
-          exit $BUILD_EXIT
+          gradle assembleDebug --no-daemon --stacktrace 2>&1
+          echo "=== APK output ==="
+          find . -name "*.apk" -exec ls -lh {} \;
+
+      - name: Verify APK contains game
+        run: |
+          APK=$(find . -name "app-debug.apk" | head -1)
+          echo "APK: $APK"
+          ls -lh "$APK"
+          # Check APK contains our HTML file
+          unzip -l "$APK" | grep -i "index.html" || echo "WARNING: index.html not in APK!"
+          unzip -l "$APK" | grep "assets/" || echo "WARNING: no assets in APK!"
+          # Show APK size
+          du -sh "$APK"
+
+      - name: Rename and upload APK
+        run: |
+          APK=$(find . -name "app-debug.apk" | head -1)
+          cp "$APK" /tmp/flying-george.apk
+          ls -lh /tmp/flying-george.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: flying-george-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: warn
+          path: /tmp/flying-george.apk
+          if-no-files-found: error
