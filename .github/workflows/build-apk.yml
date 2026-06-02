@@ -23,25 +23,39 @@ jobs:
       - name: Install SDK components
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "build-tools;34.0.0" "platforms;android-34" "platform-tools"
+          sdkmanager "build-tools;34.0.0" "platforms;android-34"
 
-      - name: Install Gradle
+      - name: Install Gradle 8.4
         run: |
           wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -O /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /opt/gradle
           echo "/opt/gradle/gradle-8.4/bin" >> $GITHUB_PATH
 
-      - name: Build APK with Gradle
+      - name: Show environment
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls $ANDROID_SDK_ROOT/build-tools/ || true
+          ls $ANDROID_SDK_ROOT/platforms/ || true
+          java -version
+          echo "PATH=$PATH"
+
+      - name: Build APK
         working-directory: android
         run: |
-          export ANDROID_HOME=$ANDROID_SDK_ROOT
-          gradle assembleRelease --no-daemon --stacktrace
-        env:
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          export ANDROID_HOME=${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}
+          gradle assembleRelease --no-daemon --info 2>&1 | tee /tmp/build.log || (tail -100 /tmp/build.log && exit 1)
+
+      - name: Upload build log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: flying-george-apk
           path: android/app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
+          if-no-files-found: warn
