@@ -8,40 +8,43 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Setup Expo & EAS
-        uses: expo/expo-github-action@v8
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install build tools
+        run: sdkmanager "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          expo-version: latest
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          name: flying-george-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Register Expo project & Build APK
-        run: |
-          # Initialize the project on Expo if not yet registered
-          npx eas-cli project:info --non-interactive 2>/dev/null || \
-            npx eas-cli project:create --non-interactive --name "flying-george" 2>/dev/null || true
-          # Run the build
-          npx eas-cli build --platform android --profile preview --non-interactive --no-wait
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Build release APK (signed with debug key)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
 
-      - name: Get build URL
-        run: |
-          echo "Build submitted to EAS! Check your builds at: https://expo.dev/accounts/pfarramterloeser/projects/flying-george/builds"
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: flying-george-release
+          path: android/app/build/outputs/apk/release/app-release.apk
