@@ -31,22 +31,23 @@ jobs:
           unzip -q /tmp/gradle.zip -d /opt/gradle
           echo "/opt/gradle/gradle-8.4/bin" >> $GITHUB_PATH
 
-      - name: Show environment
+      - name: Create debug keystore
         run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls $ANDROID_SDK_ROOT/build-tools/ || true
-          ls $ANDROID_SDK_ROOT/platforms/ || true
-          java -version
-          echo "PATH=$PATH"
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 \
+            -validity 10000 -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
 
       - name: Build APK
         working-directory: android
         run: |
-          export ANDROID_HOME=${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}
-          gradle assembleRelease --no-daemon --info 2>&1 | tee /tmp/build.log || (tail -100 /tmp/build.log && exit 1)
+          export ANDROID_HOME=${ANDROID_SDK_ROOT}
+          gradle assembleRelease --no-daemon 2>&1 | tee /tmp/build.log
+          echo "=== APK files found ==="
+          find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
 
-      - name: Upload build log (always)
+      - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -57,5 +58,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: flying-george-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: |
+            android/app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
