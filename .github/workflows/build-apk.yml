@@ -8,11 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-java@v4
         with:
@@ -25,29 +23,28 @@ jobs:
       - name: Install SDK components
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "build-tools;34.0.0" "platforms;android-34"
+          sdkmanager "build-tools;30.0.3" "platforms;android-34"
 
-      - name: Install Gradle 8.4
+      - name: Install Gradle 7.6
         run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -O /tmp/gradle.zip
+          wget -q https://services.gradle.org/distributions/gradle-7.6-bin.zip -O /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /opt/gradle
-          echo "/opt/gradle/gradle-8.4/bin" >> $GITHUB_PATH
+          echo "/opt/gradle/gradle-7.6/bin" >> $GITHUB_PATH
 
-      - name: Build debug APK
+      - name: Build APK
         working-directory: android
         run: |
           export ANDROID_HOME=${ANDROID_SDK_ROOT}
-          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log; BUILD_EXIT=${PIPESTATUS[0]}
-          echo "Exit code: $BUILD_EXIT"
-          # Write last 200 lines of log to repo so we can read it
-          tail -200 /tmp/build.log > /tmp/build-tail.log
-          # Commit log to repo
-          git config user.email "ci@github.com"
-          git config user.name "GitHub Actions"
-          cp /tmp/build-tail.log build-output.log
-          git add build-output.log
-          git commit -m "CI: build log [skip ci]" || true
-          git push || true
+          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+          BUILD_EXIT=${PIPESTATUS[0]}
+          echo "==EXIT_CODE== $BUILD_EXIT"
+          # Post log to GitHub via API for debugging
+          LOG=$(tail -150 /tmp/build.log | base64 -w 0)
+          curl -s -X PUT \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${{ github.repository }}/contents/build-output.log" \
+            -d "{\"message\":\"CI: build log [skip ci]\",\"content\":\"$LOG\"}" > /dev/null 2>&1 || true
           exit $BUILD_EXIT
 
       - name: Upload APK
